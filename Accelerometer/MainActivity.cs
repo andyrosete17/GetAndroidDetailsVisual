@@ -1,16 +1,13 @@
 ﻿using Android.App;
-using Android.Widget;
-using Android.OS;
-using Android.Support.V7.App;
-using Android.Hardware;
-using Android.Runtime;
 using Android.Content;
-using System.Runtime.Remoting.Contexts;
+using Android.Hardware;
+using Android.OS;
+using Android.Runtime;
+using Android.Support.V7.App;
+using Android.Widget;
+using Java.IO;
 using Java.Lang;
 using System;
-using Java.IO;
-using System.IO;
-using System.Collections.Generic;
 
 namespace Accelerometer
 {
@@ -25,30 +22,12 @@ namespace Accelerometer
 
         public void OnAccuracyChanged(Sensor sensor, [GeneratedEnum] SensorStatus accuracy)
         {
-            throw new System.NotImplementedException();
+            GetDetailsResult();
         }
 
         public void OnSensorChanged(SensorEvent e)
         {
-            lock (_syncLock)
-            {
-
-                using (var filter = new IntentFilter(Intent.ActionBatteryChanged))
-                {
-                    using (var batteryService = Application.Context.RegisterReceiver(null, filter))
-                    {
-                        //Intent receiver = context.RegisterReceiver(null, new IntentFilter(Intent.ActionBatteryChanged));
-                        if (batteryService != null)
-                        {
-
-                            var tempExtra = batteryService.GetIntExtra(BatteryManager.ExtraTemperature, 0) / 10;
-                            var level = batteryService.GetIntExtra(BatteryManager.ExtraLevel, 0);
-
-                            _sensorTextView.Text = "Temp: " + tempExtra.ToString() + "oC\nBattery level: " + level + "%";
-                        }
-                    }
-                }
-            }
+            GetDetailsResult();
         }
 
         protected override void OnCreate(Bundle savedInstanceState)
@@ -59,7 +38,6 @@ namespace Accelerometer
             _sensorManager = (SensorManager)GetSystemService(SensorService);
             _sensorTextView = FindViewById<TextView>(Resource.Id.accelerometer_test);
             battery = (BatteryManager)GetSystemService(BatteryService);
-
         }
 
         protected override void OnResume()
@@ -73,31 +51,32 @@ namespace Accelerometer
 
         private void GetDetails()
         {
-            GetCPUDetails();
-
-            GetBatteryDetails();
-            var x2= getCpuUsageStatistic();
-            var x = getCPUFrequencyCurrent();
-
-
+            GetDetailsResult();
         }
 
-
+        private void GetDetailsResult()
+        {
+            GetCPUDetails();
+            GetCpuUsageStatistic();
+            GetBatteryDetails();
+        }
 
         private void GetBatteryDetails()
         {
-            using (var filter = new IntentFilter(Intent.ActionBatteryChanged))
+            lock (_syncLock)
             {
-                using (var batteryService = Application.Context.RegisterReceiver(null, filter))
+                using (var filter = new IntentFilter(Intent.ActionBatteryChanged))
                 {
-                    //Intent receiver = context.RegisterReceiver(null, new IntentFilter(Intent.ActionBatteryChanged));
-                    if (batteryService != null)
+                    using (var batteryService = Application.Context.RegisterReceiver(null, filter))
                     {
+                        //Intent receiver = context.RegisterReceiver(null, new IntentFilter(Intent.ActionBatteryChanged));
+                        if (batteryService != null)
+                        {
+                            var tempExtra = batteryService.GetIntExtra(BatteryManager.ExtraTemperature, 0) / 10;
+                            var level = batteryService.GetIntExtra(BatteryManager.ExtraLevel, 0);
 
-                        var tempExtra = batteryService.GetIntExtra(BatteryManager.ExtraTemperature, 0) / 10;
-                        var level = batteryService.GetIntExtra(BatteryManager.ExtraLevel, 0);
-
-                        _sensorTextView.Text += "Battery Temp: " + tempExtra.ToString() + "oC\nBattery level: " + level + "%";
+                            _sensorTextView.Text += "Battery Temp: " + tempExtra.ToString() + "oC\nBattery level: " + level + "%";
+                        }
                     }
                 }
             }
@@ -136,32 +115,10 @@ namespace Accelerometer
 
         }
 
-        public List<string> getCPUFrequencyCurrent()
-        {
-            Java.Lang.Process p;
-            var NumCores = Runtime.GetRuntime().AvailableProcessors();
-            var output = new List<string>();
-            for (int i = 0; i < NumCores; i++)
-            {
-                p = Runtime.GetRuntime().Exec("cat /sys/devices/system/cpu/");
-                p.WaitForAsync();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(p.InputStream));
-                var lines = "";
-                var total = "";
-                while ((lines = reader.ReadLine()) != null)
-                {
-                    total += lines;
-                }
-
-                var line = reader.ReadLine();
-                output.Add(line);
-
-            }
-            return output;
-        }
+       
 
 
-        private string executeTop()
+        private string ExecuteTop()
         {
             Java.Lang.Process p = null;
             BufferedReader reader;
@@ -197,10 +154,10 @@ namespace Accelerometer
         }
 
 
-        public int[] getCpuUsageStatistic()
+        public void GetCpuUsageStatistic()
         {
 
-            string tempString = executeTop();
+            string tempString = ExecuteTop();
 
             tempString = tempString.Replace(",", "");
             tempString = tempString.Replace("User", "");
@@ -220,7 +177,10 @@ namespace Accelerometer
                 myString[i] = myString[i].Trim();
                 cpuUsageAsInt[i] = Integer.ParseInt(myString[i]);
             }
-            return cpuUsageAsInt;
+            _sensorTextView.Text += "CPU Usage - User: " + cpuUsageAsInt[0].ToString() + "%\n";
+            _sensorTextView.Text += "CPU Usage - System: " + cpuUsageAsInt[1].ToString() + "%\n";
+            _sensorTextView.Text += "CPU Usage - IOW: " + cpuUsageAsInt[2].ToString() + "%\n";
+            _sensorTextView.Text += "CPU Usage - IRQ: " + cpuUsageAsInt[3].ToString() + "%\n";
         }
 
 
